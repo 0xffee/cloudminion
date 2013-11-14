@@ -1,7 +1,4 @@
-cloudminion
-===========
-
-DESCRIPTION
+## DESCRIPTION
 
 CloudMinion is a set of tools for identifying unused OpenStack VMs, setting and managing expiration dates, shutting down and deleting expired VMs.
 
@@ -13,7 +10,7 @@ It consists of the following components:
 
 
 
-REQUIREMENTS
+## REQUIREMENTS
 
 Packages:
 perl-DBD-MySQL needs to be installed on all compute nodes and the management node.
@@ -27,7 +24,7 @@ DB:
 
 
 
-LICENSE
+## LICENSE
 
 Copyright 2013 PayPal, Inc.
 
