@@ -23,6 +23,33 @@ DB:
 
 
 
+## Installation
+CloudMinion Management tools need to be installed on a management node and the agent on all compute nodes.
+
+# Preparation
+ 1. Create a cloud-minion database for this project with user and password, or you can use another existing DB
+ The user needs to have select, insert, update, delete, create privileges
+ 2. Create a read-only user, grant  select privileges only to nova and keystone DBs.
+ 3. Pull the CM project 
+    https://github.com/paypal/cloudminion.git
+ 4. Update cloudminion/conf/cm.cfg and  cloudminion/conf/cm_agent.cfg with values for your cloud
+ 5. Open each file under cloudminion/bin/ and change the base_dir  to your installation path
+ 6. Create instance_lifetimes table in the cloud-minion db  by running 
+    mysql .h <db host> .u <cm username> -p  <cloud-minion db>  < cloudminion/install/instance_lifetimes.sql
+
+ 
+# Installing CM on a management node
+ 1. Create a base directory for CM, example /opt/cloud_minion, and copy all updated directories and files
+ 2. Install perl-DBD-MySQL and perl-Mail-Sendmail (yum install perl-DBD-MySQL perl-Mail-Sendmail)
+
+
+# Installing CM on the compute nodes
+ 1. Create a base directory for CM, example /opt/cloud_minion
+ 2. Copy  bin/cm_agent.pl  and conf/cm_agent.conf to all nodes under the base_dir
+ 3. Install perl-DBD-MySQL   (yum install perl-DBD-MySQL)
+
+
+
 
 ## LICENSE
 
