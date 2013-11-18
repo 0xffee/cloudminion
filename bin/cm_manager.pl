@@ -162,54 +162,6 @@ sub Sync {
    my %ActiveVMs = %$ActiveVMs_ref;
    my %UUIDsToUpdate = ();
 
-   for my $uuid (keys %ActiveVMs) {
-       #check for missing user_id
-       if ( ! $ActiveVMs{$uuid}{user_id} ) {
-             if ( $ActiveVmsFromNova{$uuid}{user_id} ) {
-                $UUIDsToUpdate{$uuid} = { user_id => $ActiveVmsFromNova{$uuid}{user_id} };
-             }
-       }
-
-       #check for missing hostame
-       if ( ! $ActiveVMs{$uuid}{hostname} ) {
-             if ( $ActiveVmsFromNova{$uuid}{hostname} ) {
-                $UUIDsToUpdate{$uuid} = { hostname => $ActiveVmsFromNova{$uuid}{hostname} };
-             }
-             elsif ( $ActiveVmsFromNova{$uuid}{display_name} ) {
-                $UUIDsToUpdate{$uuid} = { hostname => $ActiveVmsFromNova{$uuid}{display_name} };
-             }
-       }
-
-       #check for missing project_name
-       if ( ! $ActiveVMs{$uuid}{project_name} ) {
-             if ( $ActiveVmsFromNova{$uuid}{project_name} ) {
-                $UUIDsToUpdate{$uuid} = { project_name => $ActiveVmsFromNova{$uuid}{project_name} };
-             }
-       }
-       #check for missing project_id
-       if ( ! $ActiveVMs{$uuid}{project_id} ) {
-             if ( $ActiveVmsFromNova{$uuid}{project_id} ) {
-                $UUIDsToUpdate{$uuid} = { project_id => $ActiveVmsFromNova{$uuid}{project_id} };
-             }
-       }
-
-   }
-
-   #
-   #  TODO : the hash needs to be populated at the end - otherwise the last is overwriting it
-   #
-   if ( keys %UUIDsToUpdate > 0 ) {
-       UpdateUuids("records",\%UUIDsToUpdate);
-   }
-
-
-   ###################################################################
-   # Update email after updating user_id
-   #print "====  Updating missing records =====\n";
-   my $ActiveVMs_ref = GetLifeTimeVMs("active");
-   my %ActiveVMs = %$ActiveVMs_ref;
-   my %UUIDsToUpdate = ();
-
    #Pushed all known emails into a hash,
    my %UserInfo = ();
    for my $uuid (keys %ActiveVMs) {
@@ -220,23 +172,54 @@ sub Sync {
           }
       }
    }
+
+
    for my $uuid (keys %ActiveVMs) {
+       #check for missing user_id
+       if ( ! $ActiveVMs{$uuid}{user_id} ) {
+             if ( $ActiveVmsFromNova{$uuid}{user_id} ) {
+                $UUIDsToUpdate{$uuid}{'user_id'} = $ActiveVmsFromNova{$uuid}{user_id};
+             }
+       }
+
+       #check for missing email
        if ( ! $ActiveVMs{$uuid}{user_email} ) {
             # Check if the email address is already in the hash
-            my $user = $ActiveVMs{$uuid}{user_id};
+            my $user = $ActiveVmsFromNova{$uuid}{user_id};
             if ( ! $UserInfo{$user} ) {
                 $UserInfo{$user} = GetEmailAddress($user);
             }
-            $UUIDsToUpdate{$uuid} = { email => $UserInfo{$user} };
+            $UUIDsToUpdate{$uuid}{'email'} = $UserInfo{$user};
        }
+
+       #check for missing hostame
+       if ( ! $ActiveVMs{$uuid}{hostname} ) {
+             if ( $ActiveVmsFromNova{$uuid}{hostname} ) {
+                $UUIDsToUpdate{$uuid}{'hostname'} = $ActiveVmsFromNova{$uuid}{hostname};
+             }
+             elsif ( $ActiveVmsFromNova{$uuid}{display_name} ) {
+                $UUIDsToUpdate{$uuid}{'hostname'} = $ActiveVmsFromNova{$uuid}{display_name};
+             }
+       }
+
+       #check for missing project_name
+       if ( ! $ActiveVMs{$uuid}{project_name} ) {
+             if ( $ActiveVmsFromNova{$uuid}{project_name} ) {
+                $UUIDsToUpdate{$uuid}{'project_name'} = $ActiveVmsFromNova{$uuid}{project_name};
+             }
+       }
+       #check for missing project_id
+       if ( ! $ActiveVMs{$uuid}{project_id} ) {
+             if ( $ActiveVmsFromNova{$uuid}{project_id} ) {
+                $UUIDsToUpdate{$uuid}{'project_id'} = $ActiveVmsFromNova{$uuid}{project_id};
+             }
+       }
+
    }
-   ###################################################################
-   #
-   #  TODO : the hash needs to be populated at the end - otherwise the last is overwriting it
-   #
    if ( keys %UUIDsToUpdate > 0 ) {
        UpdateUuids("records",\%UUIDsToUpdate);
    }
+
 }
 ##############################################################
 sub SetToExpire {
@@ -368,14 +351,11 @@ sub UpdateUuids {
    my $what = shift;
    my $UUIDsToUpdate_ref = shift;
    my %UUIDsToUpdate = %$UUIDsToUpdate_ref;
-
    my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{db_host}", "$Conf{lifetime_user}", "$Conf{lifetime_password}",
                {'RaiseError' => 1 });
 
    if ($what eq "records" ) {
-       #print "Updating email ......\n";
        for my $uuid (keys %UUIDsToUpdate) {
-           #print "Updating $uuid with email: $UUIDsToUpdate{$uuid}\n";
            if ( $UUIDsToUpdate{$uuid}{user_id} ) {
                print "Updating $uuid with user_id: $UUIDsToUpdate{$uuid}{user_id}\n";
                my $sql = qq[update instance_lifetimes set user_id = '$UUIDsToUpdate{$uuid}{user_id}' where uuid = '$uuid'];
@@ -435,7 +415,7 @@ sub UpdateUuids {
    elsif ($what eq "deleted" ) {
        for my $uuid (keys %UUIDsToUpdate) {
            print "Updating $uuid with deleted = 1\n";
-           my $sql = qq[update instance_lifetimes set deleted = 1 and state = 'deleted' where uuid = '$uuid'];
+           my $sql = qq[update instance_lifetimes set deleted = 1, state = 'deleted' where uuid = '$uuid'];
            my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
            $sth->execute();
            $sth->finish();
