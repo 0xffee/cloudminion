@@ -266,19 +266,20 @@ sub GetLifeTimeVMs {
         $where_condition = qq[where deleted = 0];
     }
     elsif ($what eq "expired" ) {
-        $where_condition = qq[where deleted = 0 and expiration_date != '0000-00-00' and expiration_date <= CURDATE()];
+        $where_condition = qq[where deleted = 0 and state != 'shutdown' and expiration_date != '0000-00-00' and expiration_date <= CURDATE()];
     }
     elsif ($what eq "unused" )  {
         $where_condition = qq[where deleted = 0 and unused = 'true' and expiration_date is null and state != 'not_in_nova'];    
     }
     elsif ($what eq "shutdown" ) {
-        $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date <= DATE_SUB(CURDATE(), interval 7 day)];
+        $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date <= DATE_SUB(CURDATE(), interval $Conf{days_to_keep_shutdown} day)];
     }
     elsif ($what eq "reminder-shutdown" ) {
-        $where_condition = qq[where deleted = 0 and expiration_date = DATE_ADD(CURDATE(), interval 2 day)];
+        $where_condition = qq[where deleted = 0 and expiration_date = DATE_ADD(CURDATE(), interval $Conf{days_to_remind_before_action} day)];
     }
     elsif ($what eq "reminder-delete" ) {
-        $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date = DATE_SUB(CURDATE(), interval 5 day)];
+        my $days_to_remind_before_delete = ( $Conf{days_to_keep_shutdown} - $Conf{days_to_remind_before_action} );
+        $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date = DATE_SUB(CURDATE(), interval $days_to_remind_before_delete day)];
     }
     elsif ($what eq "match" ) {
         $where_condition = qq[where deleted = 0 and expiration_date is null and state != 'not_in_nova' and hostname like '%$what_value%'];
@@ -575,7 +576,7 @@ sub ShutDownVMs {
        }
 
        #Sending notification
-       my $expiration_date = GetExpirationDate($days_to_expire);
+       my $expiration_date = GetExpirationDate($Conf{days_to_keep_shutdown});
        SendNotification(\%UserEmail_VMs_List, "shutdown", $expiration_date);
    }
 }
