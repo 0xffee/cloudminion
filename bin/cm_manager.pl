@@ -9,11 +9,11 @@ my $conf_file = "${base_dir}/conf/cm.cfg";
 my $conf_ref = get_conf();
 my %Conf = %$conf_ref;
 
-my ($full_run, $list, $set_to_expire, $sync, $delete, $shutdown, $send_reminder);
+my ($full_run, $report, $list, $set_to_expire, $sync, $delete, $shutdown, $send_reminder);
 my ($days_to_expire, $hostname_match, $defined_date, $vm_state);
 my ($noop, $debug_email, $help);
 
-GetOptions( 'list|l=s'         => \$list,
+GetOptions( 'report'           => \$report,
             'sync|s'           => \$sync,
             'full-run'         => \$full_run,
             'shutdown'         => \$shutdown,
@@ -29,6 +29,26 @@ GetOptions( 'list|l=s'         => \$list,
             'help|h'           => \$help,
 );
 
+my %Reports = ();
+$Reports{unused}           = { name => 'Set to expire', order => '1' };
+$Reports{expired}          = { name => 'To be shutdown', order => '2' };
+$Reports{shutdown}          = { name => 'To be deleted', order => '3' };
+$Reports{shutdown_reminder} = { name => 'Reminder to be shutdown', order => '4' };
+$Reports{delete_reminder}   = { name => 'Reminder to be deleted', order => '5' };
+
+my %ColumnNames = ();
+$ColumnNames{uuid}            = { colname => 'UUID', order => '1' };
+$ColumnNames{hostname}        = { colname => 'Hostname', order => '2' };
+$ColumnNames{user_id}         = { colname => 'User', order => '3' };
+$ColumnNames{project_name}    = { colname => 'Project', order => '4' };
+$ColumnNames{user_email}      = { colname => 'UserEmail', order => '5' };
+$ColumnNames{expiration_date} = { colname => 'Expiration Date', order => '6' };
+
+if ( ! $defined_date ) {
+    $defined_date = `date +%Y-%m-%d`;
+    chomp($defined_date);
+}
+
 ####################################################################
 if ( $full_run ) {
     print "Running full run (sync, set-to-expire, send-reminder, shutdown, delete)\n";
@@ -38,93 +58,24 @@ if ( $full_run ) {
     ShutDownVMs();
     DeleteVMs();
     SendReminder();
-
 }
-elsif ( $list =~ m/expired/ ) {
-    my $LifeTimeVMs_ref = GetLifeTimeVMs("expired");
-    my %LifeTimeVMs = %$LifeTimeVMs_ref;
-    if ($list =~ m/expired-by-email/ ) {
-        my $UserVMs_ref = GetUserVMs(\%LifeTimeVMs);
-        my %UserVMs = %$UserVMs_ref;
-        for my $email (keys %UserVMs ) {
-            print "$email : $UserVMs{$email}{vms}\n";
-        } 
-    }
-    else {
-        print "\nShowing expired VMs\n";
-        print "--------------------------------------------------------------------------------\n";
-        print "UUID              : hostname  : UserName : ProjectName : UserEmail : ExpirationDate\n";
-        for my $uuid (keys %LifeTimeVMs ) {
-            print "$uuid\t$LifeTimeVMs{$uuid}{hostname}\t$LifeTimeVMs{$uuid}{user_id}\t$LifeTimeVMs{$uuid}{project_name}\t$LifeTimeVMs{$uuid}{user_email}\t$LifeTimeVMs{$uuid}{expiration_date}\n";
-        }
-    }
+elsif ( $report ) {
+    Report();
 }
-elsif ( $list =~ /unused/ ) {
-   my $LifeTimeVMs_ref = GetLifeTimeVMs("unused");
-   my %LifeTimeVMs = %$LifeTimeVMs_ref;
-   if ($list =~ m/unused-by-email/ ) {
-        my $UserVMs_ref = GetUserVMs(\%LifeTimeVMs);
-        my %UserVMs = %$UserVMs_ref;
-        for my $email (keys %UserVMs ) {
-            print "$email : $UserVMs{$email}{vms}\n";
-        }
-   }
-   else {
-      for my $uuid (keys %LifeTimeVMs) {
-          print "$uuid\t$LifeTimeVMs{$uuid}{hostname}\t$LifeTimeVMs{$uuid}{user_id}\t$LifeTimeVMs{$uuid}{project_name}\t$LifeTimeVMs{$uuid}{user_email}\n";
-      }
-   }
-}
-elsif ( $list =~ /to-be-shutdown/ ) {
-    my $LifeTimeVMs_ref = GetLifeTimeVMs("expired");
-    my %LifeTimeVMs = %$LifeTimeVMs_ref;
-    for my $uuid (keys %LifeTimeVMs) {
-        print "$uuid : $LifeTimeVMs{$uuid}{hostname} : $LifeTimeVMs{$uuid}{user_id} : $LifeTimeVMs{$uuid}{project_name} : $LifeTimeVMs{$uuid}{user_email}\n";
-    }
-}
-elsif ( $list =~ /to-be-deleted/ ) {
-    my $LifeTimeVMs_ref = GetLifeTimeVMs("shutdown");
-    my %LifeTimeVMs = %$LifeTimeVMs_ref;
-    for my $uuid (keys %LifeTimeVMs) {
-        print "$uuid : $LifeTimeVMs{$uuid}{hostname} : $LifeTimeVMs{$uuid}{user_id} : $LifeTimeVMs{$uuid}{project_name} : $LifeTimeVMs{$uuid}{user_email}\n";
-    }
-}
-elsif ( $list =~ /reminder-shutdown/ ) {
-    my $LifeTimeVMs_ref = GetLifeTimeVMs("reminder-shutdown");
-    my %LifeTimeVMs = %$LifeTimeVMs_ref;
-    for my $uuid (keys %LifeTimeVMs) {
-        print "$uuid : $LifeTimeVMs{$uuid}{hostname} : $LifeTimeVMs{$uuid}{user_id} : $LifeTimeVMs{$uuid}{project_name} : $LifeTimeVMs{$uuid}{user_email}\n";
-    }
-}
-elsif ( $list =~ /reminder-delete/ ) {
-    my $LifeTimeVMs_ref = GetLifeTimeVMs("reminder-delete");
-    my %LifeTimeVMs = %$LifeTimeVMs_ref;
-    for my $uuid (keys %LifeTimeVMs) {
-        print "$uuid : $LifeTimeVMs{$uuid}{hostname} : $LifeTimeVMs{$uuid}{user_id} : $LifeTimeVMs{$uuid}{project_name} : $LifeTimeVMs{$uuid}{user_email}\n";
-    }
-}
-
-####################################################
 elsif ( $set_to_expire ) {
-   &SetToExpire;
+    SetToExpire();
 }
 elsif ( $sync ) {
-   &Sync;
+    Sync();
 }
 elsif ( $delete ) {
-   &DeleteVMs;
+    DeleteVMs();
 }
 elsif ( $shutdown ) {
-   if ( ! $defined_date ) {
-      $defined_date = `date +%Y-%m-%d`;
-      chomp($defined_date);
-   }
-   print "Shutting down VMs with expiration date older than $defined_date\n";
-   &ShutDownVMs; 
-   
+   ShutDownVMs(); 
 }
 elsif ( $send_reminder ) {
-   &SendReminder;
+   SendReminder();
 }
 else {
    help();
@@ -132,15 +83,14 @@ else {
 ############################################################
 ############################################################
 sub Sync {
-    print "\nUpdating records from nova and keystone . . . . \n";
-    print "----------------------------------------------------------------------------------------\n";
+    print "\nRunning Sync (Updating records from nova and keystone) ............... \n";
     my $ActiveVmsFromNova_ref     = GetActiveVMs("nova");
     my %ActiveVmsFromNova         = %$ActiveVmsFromNova_ref;
     my $ActiveVmsFromLifetime_ref = GetActiveVMs("lifetime");
     my %ActiveVmsFromLifetime     = %$ActiveVmsFromLifetime_ref;
     my %UUIDsToUpdate = ();
 
-   print "====  Updating deleted uuids =====\n";
+   print "\tUpdating deleted uuids ......................\n";
    for my $lifetime_uuid ( keys %ActiveVmsFromLifetime ) {
        my $uuid_is_deleted = 1;
        for my $nova_uuid ( keys %ActiveVmsFromNova ) {
@@ -157,7 +107,7 @@ sub Sync {
        UpdateUuids("deleted",\%UUIDsToUpdate);
    }
    #####################################################################
-   print "====  Updating missing records =====\n";
+   print "\tUpdating missing records ....................\n";
    my $ActiveVMs_ref = GetLifeTimeVMs("active");
    my %ActiveVMs = %$ActiveVMs_ref;
    my %UUIDsToUpdate = ();
@@ -226,6 +176,8 @@ sub SetToExpire {
    my $option;
    my $option_value = "";
    my $description;
+
+   print "Running SetToExpire ..................\n";
    if ( ! $days_to_expire ) {
        $days_to_expire = $Conf{days_to_expire};
    }
@@ -239,7 +191,7 @@ sub SetToExpire {
       $option = "unused";
    }
 
-   print "Seting $description to expire in $days_to_expire\n";
+   #print "Setting $description to expire in $days_to_expire\n";
    SetVMsToExpire($days_to_expire,$option,$option_value);
 }
 ############################################################
@@ -274,10 +226,10 @@ sub GetLifeTimeVMs {
     elsif ($what eq "shutdown" ) {
         $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date <= DATE_SUB(CURDATE(), interval $Conf{days_to_keep_shutdown} day)];
     }
-    elsif ($what eq "reminder-shutdown" ) {
+    elsif ($what eq "shutdown_reminder" ) {
         $where_condition = qq[where deleted = 0 and expiration_date = DATE_ADD(CURDATE(), interval $Conf{days_to_remind_before_action} day)];
     }
-    elsif ($what eq "reminder-delete" ) {
+    elsif ($what eq "delete_reminder" ) {
         my $days_to_remind_before_delete = ( $Conf{days_to_keep_shutdown} - $Conf{days_to_remind_before_action} );
         $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date = DATE_SUB(CURDATE(), interval $days_to_remind_before_delete day)];
     }
@@ -397,6 +349,7 @@ sub UpdateUuids {
    }
    elsif ($what eq "expiration_date") {
          for my $uuid (keys %UUIDsToUpdate) {
+              print "\tSetting $uuid to expire in $days_to_expire days\n";
               my $sql = qq[update instance_lifetimes set expiration_date = DATE_ADD(CURDATE(), interval $days_to_expire day) where uuid = '$uuid'];
               my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
               $sth->execute();
@@ -435,17 +388,20 @@ sub SetVMsToExpire {
    my %UserEmail_VMs_List = ();
 
    if ( $option eq "match" ) {
-      print "Setting to expire VMs matching $option_value\n";
+      print "\tSetting VMs to expire matching $option_value\n";
       my $SelectedVMs_ref = GetLifeTimeVMs($option,$option_value);
       %SelectedVMs = %$SelectedVMs_ref;
    }
    elsif ( $option eq "unused" ) {
-      print "Setting to expire VMs marked as unused\n";
+      print "\tSetting VMs to expire marked as unused\n";
       my $SelectedVMs_ref = GetLifeTimeVMs("unused");
       %SelectedVMs = %$SelectedVMs_ref;
    }
 
    if ( keys %SelectedVMs > 0 ) {
+       my $number_elements = ( keys %SelectedVMs );
+       print "\tFound $number_elements VMs\n";
+
        my $UserEmail_VMs_List_ref = GetUserVMs(\%SelectedVMs);
        %UserEmail_VMs_List = %$UserEmail_VMs_List_ref;
 
@@ -454,13 +410,15 @@ sub SetVMsToExpire {
           UpdateUuids("expiration_date",\%SelectedVMs);
        }
        else {
-          print "NOT UPDATING\n";
+          print "\tRunning in noop mode (not updating the DB)\n";
        }
  
        #Sending notification
        my $expiration_date = GetExpirationDate($days_to_expire);
        SendNotification(\%UserEmail_VMs_List, "expiration", $expiration_date);
-
+   }
+   else {
+       print "\tNo VMs found to have expiration date set\n";
    }
 }
 ############################################################
@@ -468,30 +426,43 @@ sub SendReminder {
 
     my $days_to_expire = 2;  # TODO - make this configurable
 
+    print "Running SendReminder ....................\n";
+
     #To be shutdown
-    my $SelectedVMs_ref = GetLifeTimeVMs("reminder-shutdown");
+    my $SelectedVMs_ref = GetLifeTimeVMs("shutdown_reminder");
     my %SelectedVMs = %$SelectedVMs_ref;
 
     if ( keys %SelectedVMs > 0 ) {     
+        my $number_elements = ( keys %SelectedVMs );
+        print "\tFound $number_elements VMs for shutdown reminder\n";
+
         my $UserEmail_VMs_List_ref = GetUserVMs(\%SelectedVMs);
         my %UserEmail_VMs_List = %$UserEmail_VMs_List_ref;
 
         my $expiration_date = GetExpirationDate($days_to_expire);
-        SendNotification(\%UserEmail_VMs_List, "reminder-shutdown", $expiration_date);
+        SendNotification(\%UserEmail_VMs_List, "shutdown_reminder", $expiration_date);
+    }
+    else {
+        print "\tNo VMs found for shutdown reminder\n";
     }
 
     #To be deleted
-    my $SelectedVMs_ref = GetLifeTimeVMs("reminder-delete");
+    my $SelectedVMs_ref = GetLifeTimeVMs("delete_reminder");
     my %SelectedVMs = %$SelectedVMs_ref;
 
     if ( keys %SelectedVMs > 0 ) {
+        my $number_elements = ( keys %SelectedVMs );
+        print "\tFound $number_elements VMs for delete reminder\n";
+
         my $UserEmail_VMs_List_ref = GetUserVMs(\%SelectedVMs);
         my %UserEmail_VMs_List = %$UserEmail_VMs_List_ref;
 
         my $expiration_date = GetExpirationDate($days_to_expire);
-        SendNotification(\%UserEmail_VMs_List, "reminder-delete", $expiration_date);
+        SendNotification(\%UserEmail_VMs_List, "delete_reminder", $expiration_date);
     }
-
+    else {
+        print "\tNo VMs found for delete reminder\n";
+    }
 }
 ############################################################
 sub SendNotification {
@@ -501,9 +472,17 @@ sub SendNotification {
     my $email_file = "/var/tmp/email_file.txt";
     my $subject = "$Conf{email_subject_expiration}";
     my %List = %$List_ref;
+ 
+    my $number_elements = (keys %List); 
+    print "\tSending Email Notifications to $number_elements users\n";
 
     if ($notification_type =~ m/reminder/ ) {
        $subject = "Reminder: $subject";
+    }
+    if ($notification_type eq "deleted" ) {
+       $subject = $Conf{email_subject_deleted};
+    }elsif ($notification_type eq "shutdown" ) {
+       $subject = $Conf{email_subject_shutdown};
     }
 
     my $EmailTemplate = "${base_dir}/email_templates/${notification_type}.tmpl";
@@ -553,8 +532,13 @@ sub SendNotification {
 sub ShutDownVMs {
     my $SelectedVMs_ref = GetLifeTimeVMs("expired");
     my %SelectedVMs     = %$SelectedVMs_ref;
+   
+    print "Running ShutDownVMs ..............\n"; 
 
     if ( keys %SelectedVMs > 0 ) {
+       my $number_elements = ( keys %SelectedVMs );
+       print "\tFound $number_elements VMs\n";
+
        my $UserEmail_VMs_List_ref = GetUserVMs(\%SelectedVMs);
        my %UserEmail_VMs_List = %$UserEmail_VMs_List_ref;
 
@@ -572,12 +556,15 @@ sub ShutDownVMs {
            }
        }
        else {
-          print "NOT UPDATING\n";
+          print "\tRunning in noop mode (not updating the DB)\n";
        }
 
        #Sending notification
        my $expiration_date = GetExpirationDate($Conf{days_to_keep_shutdown});
        SendNotification(\%UserEmail_VMs_List, "shutdown", $expiration_date);
+   }
+   else {
+       print "\tNo VMs found to be shutdown for $defined_date\n";
    }
 }
 ############################################################
@@ -585,7 +572,12 @@ sub DeleteVMs {
     my $SelectedVMs_ref = GetLifeTimeVMs("shutdown");
     my %SelectedVMs     = %$SelectedVMs_ref;
 
+    print "Running DeleteVMs ....................\n";
+
     if ( keys %SelectedVMs > 0 ) {
+       my $number_elements = ( keys %SelectedVMs );
+       print "\tFound $number_elements VMs\n";
+
        my $UserEmail_VMs_List_ref = GetUserVMs(\%SelectedVMs);
        my %UserEmail_VMs_List     = %$UserEmail_VMs_List_ref;
 
@@ -603,12 +595,16 @@ sub DeleteVMs {
            }
        }
        else {
-          print "NOT UPDATING\n";
+          print "\tRunning in noop mode (not updating the DB)\n";
        }
 
        #Sending notification
        #my $expiration_date = GetExpirationDate($days_to_expire);
        SendNotification(\%UserEmail_VMs_List, "deleted" );
+   }
+   else {
+       print "\tNo VMs to be deleted for $defined_date\n";
+
    }
 
 
@@ -673,6 +669,46 @@ sub GetExpirationDate {
     return $expiration_date;
 }
 ############################################################
+sub Report {
+    for my $report ( sort { $Reports{$a}{order} <=> $Reports{$b}{order} }keys %Reports) {
+        print "==========================================================================\n";
+        print "###  $Reports{$report}{name}\n\n";
+        my $LifeTimeVMs_ref = GetLifeTimeVMs($report);    
+        my %LifeTimeVMs = %$LifeTimeVMs_ref;
+
+        if (keys %LifeTimeVMs ) { 
+        # TODO - calculate the spacing 
+        for my $key (sort { $ColumnNames{$a}{order} <=> $ColumnNames{$b}{order} } keys %ColumnNames) {
+            print "$ColumnNames{$key}{colname} \t";
+        }
+        print "\n";
+        }
+
+        for my $uuid (keys %LifeTimeVMs) {
+           print "$uuid";
+           for my $colname (sort { $ColumnNames{$a}{order} <=> $ColumnNames{$b}{order} } keys %ColumnNames) {
+               print "  $LifeTimeVMs{$uuid}{$colname}";
+           }
+           print "\n";
+        }
+        print "\n";
+    }
+
+#        my $l = 0;
+#        foreach my $key (keys %AllUsers) {
+#            $l = length($key) if length($key) > $l;
+#        }
+#
+#        printf "%-${l}s    %s\n", 'UserID', 'User Name';
+#        print "---------------------------------------------\n";
+#        foreach (sort { ($AllUsers{$a} cmp $AllUsers{$b}) || ($a cmp $b) } keys %AllUsers )  {
+#            printf "%-${l}s    %s\n", $_, $AllUsers{$_};
+#        }
+
+
+
+}
+############################################################
 sub get_conf {
    my %conf = ();
    my @CONF = `cat $conf_file`;
@@ -699,19 +735,15 @@ sub logger {
 }
 ###########################################################
 sub help {
-   print "Usage: $0 --list|--delete|--sync\n";
-   print "\t--list\n";
-   print "\t		<unused>         List unused VMs\n";
-   print "\t		<to-be-shutdown> List VMs that need to be shutdown\n";
-   print "\t		<to-be-deleted>  List VMs that need to be shutdown\n";
-   print "\t		<reminder-shutdown>\n";
-   print "\t		<reminder-delete>\n";
+   #print "Usage: $0 --report|--delete|--sync\n";
+   print "Options:\n";
+   print "\t--report		Display a report of all actions/instances for today\n";
    print "\t--full-run		Runs: sync,set-expired,shutdown,delete,send-reminder\n";
-   print "\t--set-expired	Sets VMs marked as unused to expire\n";
-   print "\t--delete    	Deletes the VMs scheduled to deleted today\n";
-   print "\t--sync      	Syncs lifetime with nova and keystone, deleted uuids, missing records, etc\n";
-   print "\t--shutdown		Shuts down VMs scheduled to be deleted. Optional: Use --date <yyyy-mm-dd> to specify a date\n";
-   print "\t--send-reminder	Send reminder for VMs to be shutdown or deleted\n";
-   print "\t--noop		Does not update the DB\n";
-   print "\t--debug-email	Send emails to the debug-email address only\n";
+   print "\t--set-expired		Sets VMs marked as unused to expire\n";
+   print "\t--delete    		Deletes the VMs scheduled to deleted today\n";
+   print "\t--sync      		Syncs lifetime with nova and keystone, deleted uuids, missing records, etc\n";
+   print "\t--shutdown		Shuts down VMs scheduled to be deleted.\n";
+   print "\t--send-reminder		Send reminder for VMs to be shutdown or deleted\n";
+   print "\t--noop			Does not update the DB\n";
+   print "\t--debug-email		Send emails to the debug-email address only\n";
 }
