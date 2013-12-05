@@ -310,35 +310,35 @@ sub UpdateUuids {
    if ($what eq "records" ) {
        for my $uuid (keys %UUIDsToUpdate) {
            if ( $UUIDsToUpdate{$uuid}{user_id} ) {
-               print "Updating $uuid with user_id: $UUIDsToUpdate{$uuid}{user_id}\n";
+               print "\tUpdating $uuid with user_id: $UUIDsToUpdate{$uuid}{user_id}\n";
                my $sql = qq[update instance_lifetimes set user_id = '$UUIDsToUpdate{$uuid}{user_id}' where uuid = '$uuid'];
                my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
                $sth->execute();
                $sth->finish();
            }
            if ( $UUIDsToUpdate{$uuid}{email} ) {
-               print "Updating $uuid with email: $UUIDsToUpdate{$uuid}{email}\n";
+               print "\tUpdating $uuid with email: $UUIDsToUpdate{$uuid}{email}\n";
                my $sql = qq[update instance_lifetimes set user_email = '$UUIDsToUpdate{$uuid}{email}' where uuid = '$uuid'];
                my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
                $sth->execute(); 
                $sth->finish();
            }
            if ( $UUIDsToUpdate{$uuid}{hostname} ) {
-               print "Updating $uuid with hostname: $UUIDsToUpdate{$uuid}{hostname}\n";
+               print "\tUpdating $uuid with hostname: $UUIDsToUpdate{$uuid}{hostname}\n";
                my $sql = qq[update instance_lifetimes set hostname = '$UUIDsToUpdate{$uuid}{hostname}' where uuid = '$uuid'];
                my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
                $sth->execute();
                $sth->finish();
            }
            if ( $UUIDsToUpdate{$uuid}{project_name} ) {
-               print "Updating $uuid with project_name: $UUIDsToUpdate{$uuid}{project_name}\n";
+               print "\tUpdating $uuid with project_name: $UUIDsToUpdate{$uuid}{project_name}\n";
                my $sql = qq[update instance_lifetimes set project_name = '$UUIDsToUpdate{$uuid}{project_name}' where uuid = '$uuid'];
                my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
                $sth->execute();
                $sth->finish();
            }
            if ( $UUIDsToUpdate{$uuid}{project_id} ) {
-               print "Updating $uuid with project_id: $UUIDsToUpdate{$uuid}{project_id}\n";
+               print "\tUpdating $uuid with project_id: $UUIDsToUpdate{$uuid}{project_id}\n";
                my $sql = qq[update instance_lifetimes set project_id = '$UUIDsToUpdate{$uuid}{project_id}' where uuid = '$uuid'];
                my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
                $sth->execute();
@@ -368,7 +368,7 @@ sub UpdateUuids {
    }
    elsif ($what eq "deleted" ) {
        for my $uuid (keys %UUIDsToUpdate) {
-           print "Updating $uuid with deleted = 1\n";
+           print "\tUpdating $uuid with deleted = 1\n";
            my $sql = qq[update instance_lifetimes set deleted = 1, state = 'deleted' where uuid = '$uuid'];
            my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
            $sth->execute();
@@ -546,7 +546,7 @@ sub ShutDownVMs {
        if (!$noop) {
            UpdateUuids("shutdown",\%SelectedVMs);
            for my $uuid (keys %SelectedVMs) {
-               print "Shutting down: $uuid -> $SelectedVMs{$uuid}{hostname}\n";
+               print "\tShutting down: $uuid -> $SelectedVMs{$uuid}{hostname}\n";
                logger("Shutting down $uuid -> $SelectedVMs{$uuid}{hostname}");
                my $result = `${base_dir}/bin/run_os_cmd.sh nova stop $uuid`;
                if ( $result ne "" ) {
@@ -585,7 +585,7 @@ sub DeleteVMs {
        if (!$noop) {
            UpdateUuids("deleted",\%SelectedVMs);
            for my $uuid (keys %SelectedVMs) {
-               print "Deleting: $uuid -> $SelectedVMs{$uuid}{hostname}\n";
+               print "\tDeleting: $uuid -> $SelectedVMs{$uuid}{hostname}\n";
                logger("Deleting: $uuid -> $SelectedVMs{$uuid}{hostname}");
                my $result = `${base_dir}/bin/run_os_cmd.sh nova delete $uuid`;
                if ( $result ne "" ) {
