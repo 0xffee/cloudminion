@@ -31,9 +31,15 @@ my $debug;
 GetOptions( 'debug'   => \$debug );
 
 my $rules_boolean_operator = "or"; # Default operator
+my $check_unused_vms = "false";
+
 if ( $Conf{rules_boolean_operator} ) {
    $rules_boolean_operator = $Conf{rules_boolean_operator};
 }
+if ( $Conf{check_unused_vms} ) {
+   $check_unused_vms = $Conf{check_unused_vms};
+}
+
 
 my $current_time = time();
 
@@ -54,7 +60,7 @@ foreach my $domain (keys %Instances) {
     my $final_result;
     my $expiration_date = GetVMExpirationDate($uuid);
 
-    if ( ! $expiration_date ) {
+    if ( ! $expiration_date or $check_unused_vms eq "true" ) {
         print "Checking $domain ($uuid)\n";
         if ( $GuestMountRuleExists == 1 ) {
             my $UnusedResult_ref = GuestMountAndCheck($domain);
