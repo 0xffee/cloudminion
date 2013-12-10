@@ -224,7 +224,7 @@ sub GetLifeTimeVMs {
         $where_condition = qq[where deleted = 0 and unused = 'true' and expiration_date is null and state != 'not_in_nova'];    
     }
     elsif ($what eq "shutdown" ) {
-        $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date <= DATE_SUB(CURDATE(), interval $Conf{days_to_keep_shutdown} day)];
+        $where_condition = qq[where deleted = 0 and state = 'shutdown' and expiration_date != '0000-00-00' and expiration_date <= DATE_SUB(CURDATE(), interval $Conf{days_to_keep_shutdown} day)];
     }
     elsif ($what eq "shutdown_reminder" ) {
         $where_condition = qq[where deleted = 0 and expiration_date = DATE_ADD(CURDATE(), interval $Conf{days_to_remind_before_action} day)];
@@ -641,7 +641,7 @@ sub GetUserVMs {
       for my $uuid (keys %LifeTimeVMs) {
           if ( $email eq $LifeTimeVMs{$uuid}{user_email} ) {
                $user_unused_vms = "$user_unused_vms,$LifeTimeVMs{$uuid}{hostname}";
-               $project_id = "$LifeTimeVMs{$uuid}{project_id}";
+               #$project_id = "$LifeTimeVMs{$uuid}{project_id}";
           }
       }
       $user_unused_vms =~ s/^,//g;
@@ -649,6 +649,12 @@ sub GetUserVMs {
            $email      = $Conf{default_group_email};
            $project_id = $Conf{admin_user_tid};
       }
+      else {
+           # Temporary use project_id or  tid to generate a link for each user
+           # This will go away once vmem is integrated with Horizon or Aurora 
+           $project_id = GetTID_From_Email($email);
+      }
+
       if ( $Conf{email_domain_replace} ) {
           $email =~ s/@.*/\@$Conf{email_domain_replace}/;
       }
@@ -667,6 +673,24 @@ sub GetExpirationDate {
     $fmonth += 1;
     my $expiration_date = "$fmonth/$fday/$fyear";
     return $expiration_date;
+}
+############################################################
+# This is temporary sub - it will go away once we integrate it with the dashboard or 
+# add login page
+sub GetTID_From_Email { 
+    my $email = shift;
+    my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{db_host}", "$Conf{readonly_user}", "$Conf{readonly_password}",
+               {'RaiseError' => 1 });
+    my $sql = "select distinct p.id from $Conf{keystone_db}.project p LEFT JOIN instance_lifetimes l on p.name = l.user_id where l.user_email = '$email'";
+    my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
+    $sth->execute();
+    my $result = $sth->fetchrow_hashref();
+    $sth->finish(); 
+    $dbh->disconnect();
+ 
+    my $tid = $result->{id}; 
+    return($tid);
+
 }
 ############################################################
 sub Report {
@@ -693,20 +717,6 @@ sub Report {
         }
         print "\n";
     }
-
-#        my $l = 0;
-#        foreach my $key (keys %AllUsers) {
-#            $l = length($key) if length($key) > $l;
-#        }
-#
-#        printf "%-${l}s    %s\n", 'UserID', 'User Name';
-#        print "---------------------------------------------\n";
-#        foreach (sort { ($AllUsers{$a} cmp $AllUsers{$b}) || ($a cmp $b) } keys %AllUsers )  {
-#            printf "%-${l}s    %s\n", $_, $AllUsers{$_};
-#        }
-
-
-
 }
 ############################################################
 sub get_conf {
