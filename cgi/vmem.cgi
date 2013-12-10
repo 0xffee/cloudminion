@@ -3,7 +3,6 @@
 use File::Basename;
 use CGI qw(:standard);
 use CGI::Carp qw(warningsToBrowser fatalsToBrowser);
-use Tie::IxHash;
 use strict;
 use DBI;
 
@@ -33,13 +32,11 @@ my $tenant = $params->{'tenant'};
 my $tenant_id = $params->{'tenant_id'};
 my $new_expiration_time = $params->{'new_expiration_time'};
 
-tie my %ExpirationDates, "Tie::IxHash";
-%ExpirationDates = (
-   one_month => "1 Month",
-   three_months => "3 Months",
-   one_year => "1 Year",
-   never_expires => "Never Expires"
-);
+my %ExpirationDates = ();
+$ExpirationDates{one_month}     = { name => '1 Month',       order => '1' };
+$ExpirationDates{three_months}  = { name => '3 Months',      order => '2' };
+$ExpirationDates{one_year}      = { name => '1 Year',        order => '3' };
+$ExpirationDates{never_expires} = { name => 'Never Expires', order => '4' };
 
 my %bg_color = (
    0 => '#FFFFFF',
@@ -316,7 +313,6 @@ print "&nbsp; &nbsp; Change the current expiration date<br><br>";
     my $hostname = GetVMName($uuid);
     my $current_expiration_date = GetVMExpirationDate($uuid);
    
-#KALIN
     print qq[
       <form action="$cgi_script?tid=$tid" method="post">
       <table border="0" cellspacing='0' cellpadding='2'>  
@@ -328,8 +324,8 @@ print "&nbsp; &nbsp; Change the current expiration date<br><br>";
           <td height="40">&nbsp; &nbsp; $hostname</td><td></td>
            <td align="center">$current_expiration_date &nbsp;</td><td></td>
            <td><select name="new_expiration_time"> ];
-                foreach my $key (keys %ExpirationDates) {
-                    my $value = $ExpirationDates{$key};
+                foreach my $key (sort { $ExpirationDates{$a}{order} <=> $ExpirationDates{$b}{order} }keys %ExpirationDates ) {
+                    my $value = $ExpirationDates{$key}{name};
                     print qq[<option value="$key">$value</A>\n];
                 }
       print qq[ 
@@ -403,7 +399,6 @@ sub UpdateExpirationDate {
    my $row_number = $sth->rows;
 
    if ( $row_number == 0 ) {
-       #$sql = "insert into vm_lifetimes (uuid, expiration_date) values ('$uuid', DATE_ADD(CURDATE(), interval $interval_number month))";
        $sql = "insert into instance_lifetimes (uuid, expiration_date) values ('$uuid', $new_expiration_value)";
    }
    else {
@@ -474,7 +469,7 @@ sub logger {
     my $message = shift;
     my $date = `date`;
     chomp($date);
-    open(LOG, ">>/var/log/vmem.log");
+    open(LOG, ">>$log_file");
     print LOG "$date: $message\n";
     close(LOG);
 }
