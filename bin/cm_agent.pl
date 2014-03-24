@@ -3,6 +3,7 @@
 use strict;
 use FindBin;
 use JSON::XS;
+use lib "$FindBin::Bin/../lib";
 use HTTP::Tiny;
 use File::Path qw( make_path );
 use Getopt::Long;
