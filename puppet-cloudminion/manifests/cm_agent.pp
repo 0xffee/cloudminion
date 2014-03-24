@@ -16,14 +16,14 @@ class cloudminion::cm_agent(
         ensure  => directory,
         owner   => 'root',
         group   => 'root',
-        mode    => '0775',
+        mode    => '0755',
     }
     file {'cm_conf_dir':
         path => "$cm_conf_dir",
         ensure  => directory,
         owner   => 'root',
         group   => 'root',
-        mode    => '0775',
+        mode    => '0755',
         require => [ File['cm_install_dir']],
     }
     file {'cm_bin_dir':
@@ -31,7 +31,7 @@ class cloudminion::cm_agent(
         ensure  => directory,
         owner   => 'root',
         group   => 'root',
-        mode    => '0775',
+        mode    => '0755',
         require => [ File['cm_install_dir']],
     }
     file {'cm_lib_dir':
@@ -39,7 +39,7 @@ class cloudminion::cm_agent(
         ensure  => directory,
         owner   => 'root',
         group   => 'root',
-        mode    => '0775',
+        mode    => '0755',
         require => [ File['cm_install_dir']],
     }
 
@@ -69,7 +69,7 @@ class cloudminion::cm_agent(
         group => 'root',
         source => 'puppet:///modules/cloudminion/cm_agent.pl',
         ensure => file,
-        mode => '0775',
+        mode => '0755',
         require => [ File['cm_bin_dir']],
     }
 

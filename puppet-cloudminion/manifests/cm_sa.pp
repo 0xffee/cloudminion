@@ -11,7 +11,7 @@ class cloudminion::cm_sa(
         group => 'root',
         source => 'puppet:///modules/cloudminion/cm_sa.pl',
         ensure => file,
-        mode => '0775',
+        mode => '0755',
         require => [ File['cm_bin_dir']]
     }
 
@@ -21,7 +21,7 @@ class cloudminion::cm_sa(
         group => 'root',
         source => 'puppet:///modules/cloudminion/cm_sar.pl',
         ensure => file,
-        mode => '0775',
+        mode => '0755',
         require => [ File['cm_bin_dir']]
     }
    
