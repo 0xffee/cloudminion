@@ -3,7 +3,7 @@ package Rules;
 my %Rules = (
      Network => {
            Type            => "Hypervisor",
-           Command         => "<%= @cm_bin_dir %>/cm_sar.pl --resource net --days <%= @rules_net_days %> --threshhold <%= @rules_net_threshold %> --domain",
+           Command         => "<%= @cm_bin_dir %>/cm_sar.pl --resource net --days <%= @rules_net_days %> --threshold <%= @rules_net_threshold %> --domain",
            UnusedCondition => "StringMatch",
            UnusedValue     => "unused",
      }
