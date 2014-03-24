@@ -4,7 +4,7 @@ use strict;
 use DBI;
 use Getopt::Long;
 
-my $base_dir  = "/x/itools/cloud_minion";
+my $base_dir  = "/x/itools/cloudminion";
 my $conf_file = "${base_dir}/conf/cm.cfg";
 my $conf_ref = get_conf();
 my %Conf = %$conf_ref;
