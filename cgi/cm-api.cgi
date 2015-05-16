@@ -8,7 +8,9 @@ use JSON::XS;
 use FindBin;
 use Getopt::Long;
 
-my $conf_file = "$FindBin::Bin/../conf/cm.cfg";
+my $cell = "cell-01";
+
+my $conf_file = "$FindBin::Bin/../../conf/${cell}_cm.cfg";
 my $conf_ref = get_conf();
 my %Conf = %$conf_ref;
 
@@ -53,7 +55,7 @@ POST qr{^/compute/(.*)/update$} => sub {
    my $decoded_json = $json->decode( $q->param('POSTDATA') );
    #my $decoded_json = $q->param('POSTDATA');
 
-   my $log_message = "POST compute/${compute_host}/update : JSON = $decoded_json ";
+   $log_message = "POST compute/${compute_host}/update : JSON = $decoded_json ";
    logger("$log_message") if ($Conf{debug} =~ m/true/i);
 
    my %UUIDs = %$decoded_json;
@@ -62,6 +64,40 @@ POST qr{^/compute/(.*)/update$} => sub {
    }
    else {
        my $log_message = "Updating compute_host $compute_host but empty json received";
+       logger("$log_message") if ($Conf{debug} =~ m/true/i);
+   }
+};
+POST qr{^/sa/net/update$} => sub {
+   my $json  = JSON::XS->new->utf8;
+   my $decoded_json = $json->decode( $q->param('POSTDATA') );
+
+   my $log_message = "POST sa/net/update : JSON = $decoded_json ";
+   logger("$log_message") if ($Conf{debug} =~ m/true/i);
+
+   my %UUIDs = %$decoded_json;
+   if ( keys %UUIDs > 0 ) {
+       UpdateSA_DB("net", \%UUIDs );
+   }
+   else {
+       my $log_message = "Updating sa/net but empty json received";
+       logger("$log_message") if ($Conf{debug} =~ m/true/i);
+   }
+};
+
+GET qr{^/update-cm/(.*)/(.*)$} => sub {
+   my $uuid = $1;
+   my $expiration_date = $2;
+
+   my $log_message = "POST cm-update : cell = $cell : uuid = $uuid : expiration_date = $expiration_date ";
+   logger("$log_message") if ($Conf{debug} =~ m/true/i);
+
+   my $status = UpdateCM_ExpirationDate($cell, $uuid, $expiration_date );
+   if ( $status eq "success" ) {
+       print "Success";
+   }
+   else {
+       print "Failed: $status";
+       my $log_message = "update-cm: Failed to update $cell, $uuid, $expiration_date";
        logger("$log_message") if ($Conf{debug} =~ m/true/i);
    }
 };
@@ -75,9 +111,9 @@ sub GetVMs {
     my %Hash = ();
 
     logger("Querying DB for compute_host $compute_host") if $Conf{verbose} eq "true";
-    logger("Connecting to $Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port} - with $Conf{lifetime_user} / $Conf{lifetime_password}") if $Conf{verbose} eq "true";
+    logger("Connecting to $Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port} - with $Conf{cm_user} / $Conf{cm_password}") if $Conf{verbose} eq "true";
 
-    my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port}", "$Conf{lifetime_user}", "$Conf{lifetime_password}",
+    my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port}", "$Conf{cm_user}", "$Conf{cm_password}",
           {'RaiseError' => 1 });
 
     my $sql = "select uuid, expiration_date from instance_lifetimes where deleted = 0 and compute_host = '$compute_host'";
@@ -116,7 +152,7 @@ sub UpdateDB {
    my $log_message = "Update: compute=$compute_host : ";
    logger("$log_message") if $Conf{verbose} eq "true";
 
-   my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port}", "$Conf{lifetime_user}", "$Conf{lifetime_password}",
+   my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port}", "$Conf{cm_user}", "$Conf{cm_password}",
       {'RaiseError' => 1 });
 
    for my $uuid ( keys %UUIDs) {
@@ -142,6 +178,116 @@ sub UpdateDB {
        $sth->finish();
        $log_message .= "$uuid=(unused=$unused) ";
 
+   }
+
+   $dbh->disconnect();
+   logger("$log_message") if ($Conf{debug} =~ m/true/i);
+}
+sub UpdateCM_ExpirationDate {
+    my $cell = shift;
+    my $uuid = shift;
+    my $new_expiration_time = shift;
+    my $interval_number = 0;
+    my $status;
+    my $log_message;
+
+
+    if ($new_expiration_time eq "one_month" ) {
+       $interval_number = 1;
+    }
+    elsif ($new_expiration_time eq "three_months" ) {
+       $interval_number = 3;
+    }
+    elsif ($new_expiration_time eq "one_year" ) {
+       $interval_number = 12;
+    }
+    my $new_expiration_value;
+    if ($new_expiration_time eq "never_expires" ) {
+       $new_expiration_value = "0000-00-00";
+    }
+    else {
+       $new_expiration_value = "DATE_ADD(CURDATE(), interval $interval_number month)";
+    }
+
+
+   
+    my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port}", "$Conf{cm_user}", "$Conf{cm_password}",
+      {'RaiseError' => 1 });
+
+    my $sql = "select uuid from instance_lifetimes where uuid = '$uuid'";
+    my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
+    $sth->execute();
+    $sth->rows;
+    $sth->finish();
+    my $row_number = $sth->rows;
+    if ( $row_number == 0 ) {
+        $status = "no such uuid: $uuid";
+        $log_message = "update-cm: no such uuid: $uuid";
+    }
+    else {
+        my $sql = qq[update instance_lifetimes set expiration_date = $new_expiration_value where uuid = '$uuid'];
+        my $sth = $dbh->prepare($sql);
+        $sth->execute();
+        $sth->finish();
+        $log_message = "update-cm: updated $uuid with $new_expiration_time";
+        $status = "success";
+    }
+
+    $dbh->disconnect();
+    return($status);
+}
+##############################################################################
+sub UpdateSA_DB {
+   my $resource     = shift;
+   my $UUIDs_ref    = shift;
+   my %UUIDs        = %$UUIDs_ref;
+
+   my $db_table;
+   if ( $resource eq "net" ) {
+       $db_table = "network_utilization";
+   }
+
+   my $log_message = "Update: SA/NET : ";
+   logger("$log_message") if $Conf{verbose} eq "true";
+
+   # place colums in placeholders, number of days = 14 
+   my @ColNames = ();
+   for ( my $num=1; $num<=14; $num++ ) {
+       push @ColNames, $num;
+   }
+   my $ColNames = join(', ', map { "day$_" } 1 .. @ColNames);
+
+
+   my $dbh = DBI->connect("DBI:mysql:database=$Conf{lifetime_db};host=$Conf{cm_db_host};port=$Conf{cm_db_port}", "$Conf{cm_user}", "$Conf{cm_password}",
+      {'RaiseError' => 1 });
+
+   for my $uuid ( keys %UUIDs) {
+       my @DaysValues = ();
+       foreach my $key ( reverse sort keys $UUIDs{$uuid} ) {
+            my $value = $UUIDs{$uuid}{$key};
+            push @DaysValues, $value;
+       }
+       my $placeholders = join ", ", ("?") x @DaysValues;
+                        
+       #Check whether uuid is in DB
+       my $sql = "select uuid from $db_table where uuid = '$uuid'";
+       my $sth = $dbh->prepare($sql) or die "Couldn't prepare query";
+       $sth->execute();
+       $sth->rows;
+       $sth->finish();
+       my $row_number = $sth->rows;
+
+       if ( $row_number > 0 ) {
+           my $sql = "delete from $db_table where uuid = '$uuid'";
+           my $sth = $dbh->prepare($sql);
+           $sth->execute();
+           $sth->finish(); 
+       }
+
+       $sql = "insert into $db_table (uuid,$ColNames) values ('$uuid',$placeholders)";
+       my $sth = $dbh->prepare($sql);
+       $sth->execute(@DaysValues);
+       $sth->finish();
    }
 
    $dbh->disconnect();
