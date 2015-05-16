@@ -9,9 +9,9 @@ my $conf_file = "$FindBin::Bin/../conf/cm_agent.cfg";
 my $conf_ref = get_conf();
 my %Conf = %$conf_ref;
 
-if ( ! defined $Conf{instances_dir} ) { 
+if ( ! defined $Conf{instances_dir} ) {
     print "Error: instances_dir is not defined in $conf_file\n";
-    exit 1;   
+    exit 1;
 }
 if ( ! -d $Conf{instances_dir} ) {
     print "Error: instances_dir doesn't exist: $Conf{instances_dir}\n";
@@ -87,16 +87,16 @@ sub GetNetStats {
    my %NetStats = ();
    my @NetDev = `cat /proc/net/dev`;
    foreach my $line (@NetDev) {
-       chomp($line); 
+       chomp($line);
        $line =~ s/:/: /g;
        if ($line =~ m/(.*):\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/ ) {
           my $interface = $1;
           my $received_bytes = $2;
           my $transmitted_bytes = $10;
-          $interface =~ s/^\s+//; 
-          $interface =~ s/\s+$//; 
+          $interface =~ s/^\s+//;
+          $interface =~ s/\s+$//;
           $NetStats{$interface} = { received_bytes => $received_bytes, transmitted_bytes => $transmitted_bytes};
-          
+
        }
    }
 
