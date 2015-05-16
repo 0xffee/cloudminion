@@ -1,0 +1,17 @@
+# 
+# Replace os_db_host with your OpenStack DB host
+# Change user and password below
+
+os_db_host:
+   db_object:
+       port: 3306
+       user: read_only
+       password: read_only
+   keystone:
+       target_db: os_replica
+       user:
+           columns: id,name,enabled
+           where: enabled = 1
+       project:
+           columns: id,name,extra,enabled
+           where: enabled = 1
