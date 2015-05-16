@@ -13,6 +13,10 @@ my $conf_file = "$FindBin::Bin/../conf/cm_agent.cfg";
 my $conf_ref = get_conf();
 my %Conf = %$conf_ref;
 
+my $api_url = "$Conf{cm_api_host}/cm/$Conf{az}/$Conf{cm_api}";
+
+PidFile("create");
+
 my $debug;
 GetOptions( 'debug'   => \$debug );
 
@@ -101,13 +105,25 @@ foreach my $domain (keys %Instances) {
 }
 UpdateAllVMs(\%UUIDs);
 
+PidFile("delete");
+
 ##############################################################################
 ##############################################################################
 
 sub GetInstances {
     my %Instances = ();
+
+    print "Reading all libvirt.xml files from $Conf{instances_dir} \n" if ($debug);
     my @LibvirtXML_Files = `ls $Conf{instances_dir}/*/libvirt.xml`;
-    print "Getting instances from $Conf{instances_dir} \n" if ($debug);
+
+    print "Running virsh list --all --uuid  \n" if ($debug);
+    my @Virsh_uuids = `virsh list --all --uuid`;
+    my %VirshUUIDs = ();
+    foreach my $uuid (@Virsh_uuids) {
+        chomp($uuid);
+        next if ($uuid =~ m/^$/);
+        $VirshUUIDs{$uuid} = 1;
+    }
 
     foreach my $xml_file ( @LibvirtXML_Files ) {
         chomp($xml_file);
@@ -121,9 +137,13 @@ sub GetInstances {
                $uuid = $1;
             }
         }
-        if ( $domain ne "" and $uuid ne "" ) {
+        if ( $domain ne "" and $uuid ne "" and $VirshUUIDs{$uuid} ) {
             $Instances{$domain} = $uuid;
         }
+        # The following VMs might be zombies or have undeleted files
+        #if ( ! $VirshUUIDs{$uuid} ) {
+        #   print "Missing domain: $domain  uuid: $uuid\n";
+        #}
     }
     return(\%Instances);
 }
@@ -133,9 +153,9 @@ sub GetExpirationDates {
     my $json = JSON::XS->new->utf8;
     my $decoded_json;
 
-    my $url  = "$Conf{cm_api}/compute/$compute_host/list";
+    my $url  = "${api_url}/compute/$compute_host/list";
     print "Getting VMs ExpirationDates, Request: $url\n" if ($debug);
-    
+
     my $http = HTTP::Tiny->new;
     $http->timeout(10);
     my $response = $http->get("$url");
@@ -158,7 +178,7 @@ sub UpdateAllVMs {
     my $json = JSON::XS->new->utf8;
     $json = encode_json($UUIDs_ref);
 
-    my $url  = "$Conf{cm_api}/compute/${compute_host}/update";
+    my $url  = "${api_url}/compute/${compute_host}/update";
     print "Updating VMs unused status, Post: $url\n" if ($debug);
 
     my $http = HTTP::Tiny->new;
@@ -302,6 +322,43 @@ sub RunFunction {
     }
     return ($unused_result);
 
+}
+##############################################################################
+sub PidFile {
+    my $pf_action = shift;
+    if ( ! $Conf{pidfile}) {
+        print "Error: Missing pidfile in conf file. \n";
+        exit 1;
+    }
+    if ( $pf_action eq "create" ) {
+        if ( -f $Conf{pidfile} ) {
+            my $pid = `cat $Conf{pidfile}`;
+            chomp($pid);
+            if ( ! -d "/proc/${pid}" ) {
+                print "pid file exists but the process is not running.\n";
+                system("/bin/rm $Conf{pidfile}");
+            }
+            else {
+                print "The agent is already running. $Conf{pidfile} exists. \n";
+                exit;
+            }
+        }
+        if (open(PID, ">$Conf{pidfile}")) {
+            print PID "$$\n";
+            close PID;
+        }
+        else {
+            print("Error: Could not open pidfile: $Conf{pidfile} - $! \n");
+            exit;
+        }
+   }
+   elsif ( $pf_action eq "delete" ) {
+       system("/bin/rm $Conf{pidfile}");
+       if ( -f $Conf{pidfile} ) {
+           print "Error: Could not remove $Conf{pidfile}\n";
+           exit;
+       }
+   }
 }
 ##############################################################################
 sub get_conf {
